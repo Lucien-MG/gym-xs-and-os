@@ -10,10 +10,7 @@ class XsAndOs(gym.Env):
         self.size = 3  # The size of the square grid
         self.window_size = 512  # The size of the PyGame window
 
-        # Observations are dictionaries with the agent's and the target's location.
-        # Each location is encoded as an element of {0, ..., `size`}^2, i.e. MultiDiscrete([size, size]).
-        self.observation_space = gym.spaces.Box(0, self.size - 1, shape=(2,), dtype=int)
-        print(self.observation_space)
+        self.observation_space = gym.spaces.Box(low=-1, high=1, shape=(self.size, self.size), dtype=np.int32)
 
         # We have 4 actions, corresponding to "right", "up", "left", "down", "right"
         self.action_space = gym.spaces.Discrete(9)
@@ -40,7 +37,7 @@ class XsAndOs(gym.Env):
     def reset(self, seed=None, options=None):
         super().reset(seed=seed)
 
-        self._grid = np.zeros((self.size, self.size))
+        self._grid = np.zeros((self.size, self.size), dtype=np.int32)
         self._turn = 0
 
         observation = self._get_obs()
