@@ -12,7 +12,7 @@ class XsAndOs(gym.Env):
 
         self.observation_space = gym.spaces.Box(low=-1, high=1, shape=(self.size, self.size), dtype=np.int32)
 
-        # We have 4 actions, corresponding to "right", "up", "left", "down", "right"
+        # We have 9 actions
         self.action_space = gym.spaces.Discrete(9)
 
         assert render_mode is None or render_mode in self.metadata["render_modes"]
@@ -34,11 +34,11 @@ class XsAndOs(gym.Env):
     def _get_info(self):
         return {}
 
-    def reset(self, seed=None, options=None):
+    def reset(self, seed=None, options={"start_turn": "x"}):
         super().reset(seed=seed)
 
         self._grid = np.zeros((self.size, self.size), dtype=np.int32)
-        self._turn = 0
+        self._turn = 1 if options["start_turn"] == "x" else 0
 
         observation = self._get_obs()
         info = self._get_info()
@@ -68,7 +68,7 @@ class XsAndOs(gym.Env):
 
         win_game = self._check_win_condition()
         terminated = win_game or self._check_end()
-        reward = 1 if win_game else 0
+        reward = 1 if win_game else (0 if terminated else -1)
         observation = self._get_obs()
         info = self._get_info()
 
@@ -90,7 +90,7 @@ class XsAndOs(gym.Env):
             self.clock = pygame.time.Clock()
 
         canvas = pygame.Surface((self.window_size, self.window_size))
-        canvas.fill((255, 255, 255))
+        canvas.fill((250, 250, 250))
         pix_square_size = (
             self.window_size / self.size
         )  # The size of a single grid square in pixels
@@ -98,35 +98,29 @@ class XsAndOs(gym.Env):
         # Now we draw the agent
         for i in range(self.size):
             for j in range(self.size):
+                pos = (np.array([i, j]) + 0.5) * pix_square_size
+
                 if self._grid[i, j] == 1:
                     pygame.draw.circle(
-                        canvas,
-                        (0, 0, 255),
-                        (np.array([i, j]) + 0.5) * pix_square_size,
+                        canvas, (0, 0, 255),
+                        pos,
                         pix_square_size / 3,
+                        width = 10
                     )
                 if self._grid[i, j] == -1:
-                    pygame.draw.rect(
-                        canvas,
-                        (255, 0, 0),
-                        pygame.Rect(
-                        (pix_square_size) * (np.array([i, j]) + 0.25),
-                        (pix_square_size / 2, pix_square_size / 2),
-                    ),
-                    )
+                    pygame.draw.lines(canvas, (255, 0, 0), True, [(pos[0]-50,pos[1]-50),(pos[0]+50,pos[1]+50)], 10)
+                    pygame.draw.lines(canvas, (255, 0, 0), True, [(pos[0]-50,pos[1]+50),(pos[0]+50,pos[1]-50)], 10)
 
         # Finally, add some gridlines
         for x in range(self.size + 1):
             pygame.draw.line(
-                canvas,
-                0,
+                canvas, 0,
                 (0, pix_square_size * x),
                 (self.window_size, pix_square_size * x),
                 width=3,
             )
             pygame.draw.line(
-                canvas,
-                0,
+                canvas, 0,
                 (pix_square_size * x, 0),
                 (pix_square_size * x, self.window_size),
                 width=3,
@@ -135,13 +129,15 @@ class XsAndOs(gym.Env):
         if self.render_mode == "human":
             # The following line copies our drawings from `canvas` to the visible window
             self.window.blit(canvas, canvas.get_rect())
+
             pygame.event.pump()
             pygame.display.update()
 
             # We need to ensure that human-rendering occurs at the predefined framerate.
             # The following line will automatically add a delay to keep the framerate stable.
             self.clock.tick(self.metadata["render_fps"])
-        else:  # rgb_array
+        else:
+            # rgb_array
             return np.transpose(
                 np.array(pygame.surfarray.pixels3d(canvas)), axes=(1, 0, 2)
             )
