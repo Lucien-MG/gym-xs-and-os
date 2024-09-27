@@ -34,11 +34,14 @@ class XsAndOs(gym.Env):
     def _get_info(self):
         return {}
 
-    def reset(self, seed=None, options={"start_turn": "x"}):
+    def reset(self, seed=None, options={"start_turn": "o"}):
         super().reset(seed=seed)
 
         self._grid = np.zeros((self.size, self.size), dtype=np.int32)
-        self._turn = 1 if options["start_turn"] == "x" else 0
+        self._turn = 0 if options["start_turn"] == "o" else 1
+        self._won = False
+        self._end = False
+        self._wrong_action_has_been_played = False
 
         observation = self._get_obs()
         info = self._get_info()
@@ -63,12 +66,35 @@ class XsAndOs(gym.Env):
         return 3 in values or -3 in values
 
     def step(self, action):
-        self._grid[action % 3, action // 3] = -1 if self._turn else 1
+        if self._wrong_action_has_been_played:
+            return self._get_obs(), -1, True, False, {"status": "player_" + str(self._turn) + " played a wrong action."}
+
+        if self._won:
+            return self._get_obs(), 1, True, False, {}
+
+        if self._end:
+            return self._get_obs(), 0, True, False, {}
+
+        if self._grid[action // 3, action % 3] != 0:
+            self._wrong_action_has_been_played = True
+            return self._get_obs(), 0, True, False, {"status": "player_" + str(self._turn) + " played a wrong action."}
+
+        self._grid[action // 3, action % 3] = -1 if self._turn else 1
         self._turn = (self._turn + 1) % 2
 
         win_game = self._check_win_condition()
-        terminated = win_game or self._check_end()
-        reward = 1 if win_game else (0 if terminated else -1)
+        end_game = self._check_end()
+        terminated = win_game or end_game
+
+        reward = 0
+
+        if win_game:
+            self._won = win_game
+            reward = -0.5
+        elif end_game:
+            self._end = end_game
+            reward = 0
+
         observation = self._get_obs()
         info = self._get_info()
 
@@ -100,14 +126,14 @@ class XsAndOs(gym.Env):
             for j in range(self.size):
                 pos = (np.array([i, j]) + 0.5) * pix_square_size
 
-                if self._grid[i, j] == 1:
+                if self._grid.T[i, j] == 1:
                     pygame.draw.circle(
                         canvas, (0, 0, 255),
                         pos,
                         pix_square_size / 3,
                         width = 10
                     )
-                if self._grid[i, j] == -1:
+                if self._grid.T[i, j] == -1:
                     pygame.draw.lines(canvas, (255, 0, 0), True, [(pos[0]-50,pos[1]-50),(pos[0]+50,pos[1]+50)], 10)
                     pygame.draw.lines(canvas, (255, 0, 0), True, [(pos[0]-50,pos[1]+50),(pos[0]+50,pos[1]-50)], 10)
 
